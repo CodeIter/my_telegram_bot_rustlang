@@ -1,8 +1,10 @@
 
 use teloxide::{prelude::*, utils::command::BotCommands};
+use dotenvy::dotenv;
 
 #[tokio::main]
 async fn main() {
+    dotenv().ok();
     pretty_env_logger::init();
     log::info!("Starting Telegram bot...");
 
