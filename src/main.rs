@@ -32,20 +32,6 @@ async fn main() {
         .await;
 }
 
-/*fn schema() -> UpdateHandler<RequestError> {
-    // Use RequestError (matches your handlers)
-    dptree::entry().branch(
-        Update::filter_message()
-            .branch(filter_command::<Command, _>().endpoint(
-                |bot: Bot, msg: Message, cmd: Command| async move {
-                    // ← move closure fixes Injectable wrapping
-                    command_handler(bot, msg, cmd).await
-                },
-            ))
-            .branch(Update::filter_message().endpoint(echo_text_handler)),
-    )
-}*/
-
 fn schema() -> UpdateHandler<RequestError> {
     dptree::entry().branch(
         Update::filter_message()
@@ -72,8 +58,8 @@ enum Command {
     #[command(description = "Echo any text (but we also echo without command)")]
     Echo(String),
 
-    #[command(description = "/url <encoded> → decode URL")]
-    Url(String),
+    #[command(description = "/urldecode <encoded> → decode URL")]
+    UrlDecode(String),
 
     #[command(description = "/textbase64encode <text> → encode to base64")]
     TextBase64Encode(String),
@@ -110,7 +96,7 @@ async fn command_handler(bot: Bot, msg: Message, cmd: Command) -> ResponseResult
             bot.send_message(chat_id, format!("📢 : {text}")).await?;
         }
 
-        Command::Url(encoded) => {
+        Command::UrlDecode(encoded) => {
             let decoded = percent_decode_str(&encoded).decode_utf8_lossy().to_string();
             bot.send_message(chat_id, format!("🔓 Decoded URL:\n{}", decoded))
                 .await?;
@@ -148,23 +134,6 @@ async fn command_handler(bot: Bot, msg: Message, cmd: Command) -> ResponseResult
             }
         }
 
-        /*Command::Password(len) => {
-            if !(2..=128).contains(&len) {
-                bot.send_message(chat_id, "❌ Length must be 2–128").await?;
-            } else {
-                let chars: Vec<char> =
-                    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+-="
-                        .chars()
-                        .collect();
-                let mut rng = rand::thread_rng();
-                let pw: String = (0..len)
-                    .map(|_| chars[rng.gen_range(0..chars.len())])
-                    .collect();
-
-                bot.send_message(chat_id, format!("🔑 Password ({} chars):\n`{}`", len, pw))
-                    .await?;
-            }
-        }*/
         Command::Password(len) => {
             if !(2..=128).contains(&len) {
                 bot.send_message(chat_id, "❌ Length must be 2–128").await?;
