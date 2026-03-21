@@ -13,6 +13,10 @@ use base64::{Engine as _, engine::general_purpose};
 use percent_encoding::percent_decode_str;
 use rand::Rng;
 
+use std::process::Stdio;
+use tokio::io::AsyncWriteExt;
+use tokio::process::Command as TokioProcessCommand;
+
 #[tokio::main]
 async fn main() {
     dotenv().ok();
@@ -75,6 +79,9 @@ enum Command {
 
     #[command(description = "/password <length> → generate password (>1)")]
     Password(u32),
+
+    #[command(description = "/bc <expression> → calculate with bc (e.g. /bc 2+2*3)")]
+    Bc(String),
 }
 
 async fn command_handler(bot: Bot, msg: Message, cmd: Command) -> ResponseResult<()> {
@@ -150,6 +157,24 @@ async fn command_handler(bot: Bot, msg: Message, cmd: Command) -> ResponseResult
                     .await?;
             }
         }
+
+        Command::Bc(expr) => {
+            if expr.trim().is_empty() {
+                bot.send_message(chat_id, "❌ Usage: /bc 2+2*3 or /bc sqrt(16)")
+                    .await?;
+            } else {
+                match run_bc(&expr).await {
+                    Ok(result) => {
+                        bot.send_message(chat_id, format!("📊 bc result:\n`{}`", result.trim()))
+                            .await?;
+                    }
+                    Err(e) => {
+                        bot.send_message(chat_id, format!("❌ bc error: {}", e))
+                            .await?;
+                    }
+                }
+            }
+        }
     }
     Ok(())
 }
@@ -164,4 +189,31 @@ async fn echo_text_handler(bot: Bot, msg: Message) -> ResponseResult<()> {
             .await?;
     }
     Ok(())
+}
+
+async fn run_bc(expr: &str) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
+    let mut child = TokioProcessCommand::new("bc")
+        .arg("-l") // enable math functions (sqrt, sin, etc.)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()?;
+
+    if let Some(mut stdin) = child.stdin.take() {
+        stdin.write_all(expr.as_bytes()).await?;
+        stdin.write_all(b"\n").await?; // bc needs a newline
+        stdin.flush().await?;
+    }
+
+    let output = child.wait_with_output().await?;
+    if output.status.success() {
+        Ok(String::from_utf8_lossy(&output.stdout).into_owned())
+    } else {
+        Err(format!(
+            "bc exited with code {}: {}",
+            output.status,
+            String::from_utf8_lossy(&output.stderr)
+        )
+        .into())
+    }
 }
