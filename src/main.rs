@@ -59,7 +59,7 @@ async fn command_handler(bot: Bot, msg: Message, cmd: Command) -> ResponseResult
         Command::Start => {
             bot.send_message(
                 chat_id,
-                "👋 Hello! I'm your Rust 🦀 bot powered by teloxide:!\nJust type anything → I will echo it!\nUse /help for commands list",
+                "👋 Hello! I'm your Rust 🦀 bot powered by teloxide!\nJust type anything → I will echo it!\nUse /help for commands list",
             )
             .await?;
         }
