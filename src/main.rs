@@ -1,14 +1,17 @@
-
+use dotenvy::dotenv;
+use std::sync::Arc;
 use teloxide::{
-    dispatching::{dialogue::InMemStorage, UpdateHandler},
+    RequestError,
+    dispatching::{UpdateHandler, dialogue::InMemStorage},
+    filter_command,
     prelude::*,
     types::Update,
     utils::command::BotCommands,
-    filter_command,
-    RequestError,
-};
-use dotenvy::dotenv;
-use std::sync::Arc;   // ← for default_handler
+}; // ← for default_handler
+
+use base64::{Engine as _, engine::general_purpose};
+use percent_encoding::percent_decode_str;
+use rand::Rng;
 
 #[tokio::main]
 async fn main() {
@@ -20,7 +23,7 @@ async fn main() {
 
     Dispatcher::builder(bot, schema())
         .dependencies(dptree::deps![InMemStorage::<()>::new()])
-        .default_handler(|upd: Arc<Update>| async move {   // ← FIXED: Arc<Update>
+        .default_handler(|upd: Arc<Update>| async move {
             log::warn!("Unhandled update: {upd:#?}");
         })
         .enable_ctrlc_handler()
@@ -29,17 +32,38 @@ async fn main() {
         .await;
 }
 
-fn schema() -> UpdateHandler<RequestError> {   // ← FIXED: use RequestError (matches your handlers)
+/*fn schema() -> UpdateHandler<RequestError> {
+    // Use RequestError (matches your handlers)
     dptree::entry().branch(
         Update::filter_message()
-            .branch(filter_command::<Command, _>().endpoint(command_handler))   // commands first
-            .branch(Update::filter_message().endpoint(echo_text_handler)),      // plain echo
+            .branch(filter_command::<Command, _>().endpoint(
+                |bot: Bot, msg: Message, cmd: Command| async move {
+                    // ← move closure fixes Injectable wrapping
+                    command_handler(bot, msg, cmd).await
+                },
+            ))
+            .branch(Update::filter_message().endpoint(echo_text_handler)),
+    )
+}*/
+
+fn schema() -> UpdateHandler<RequestError> {
+    dptree::entry().branch(
+        Update::filter_message()
+            .branch(filter_command::<Command, _>().endpoint(
+                |bot: Bot, msg: Message, cmd: Command| async move {
+                    command_handler(bot, msg, cmd).await
+                },
+            ))
+            .branch(Update::filter_message().endpoint(echo_text_handler)),
     )
 }
 
 // ── Commands ────────────────────────────────────────────────────────
 #[derive(BotCommands, Clone)]
-#[command(rename_rule = "lowercase", description = "These commands are supported:")]
+#[command(
+    rename_rule = "lowercase",
+    description = "These commands are supported:"
+)]
 enum Command {
     #[command(description = "Display this help text.")]
     Help,
@@ -47,6 +71,24 @@ enum Command {
     Start,
     #[command(description = "Echo any text (but we also echo without command)")]
     Echo(String),
+
+    #[command(description = "/url <encoded> → decode URL")]
+    Url(String),
+
+    #[command(description = "/textbase64encode <text> → encode to base64")]
+    TextBase64Encode(String),
+
+    #[command(description = "/textbase64decode <text> → decode base64")]
+    TextBase64Decode(String),
+
+    #[command(
+        description = "/rng <min> <max> → random number (min > 0)",
+        parse_with = "split"
+    )]
+    Rng(u32, u32),
+
+    #[command(description = "/password <length> → generate password (>1)")]
+    Password(u32),
 }
 
 async fn command_handler(bot: Bot, msg: Message, cmd: Command) -> ResponseResult<()> {
@@ -54,7 +96,8 @@ async fn command_handler(bot: Bot, msg: Message, cmd: Command) -> ResponseResult
 
     match cmd {
         Command::Help => {
-            bot.send_message(chat_id, Command::descriptions().to_string()).await?;
+            bot.send_message(chat_id, Command::descriptions().to_string())
+                .await?;
         }
         Command::Start => {
             bot.send_message(
@@ -66,6 +109,78 @@ async fn command_handler(bot: Bot, msg: Message, cmd: Command) -> ResponseResult
         Command::Echo(text) => {
             bot.send_message(chat_id, format!("📢 : {text}")).await?;
         }
+
+        Command::Url(encoded) => {
+            let decoded = percent_decode_str(&encoded).decode_utf8_lossy().to_string();
+            bot.send_message(chat_id, format!("🔓 Decoded URL:\n{}", decoded))
+                .await?;
+        }
+
+        Command::TextBase64Encode(text) => {
+            let encoded = general_purpose::STANDARD.encode(text.as_bytes());
+            bot.send_message(chat_id, format!("🔼 Base64 encoded:\n{}", encoded))
+                .await?;
+        }
+
+        Command::TextBase64Decode(encoded) => match general_purpose::STANDARD.decode(&encoded) {
+            Ok(bytes) => match String::from_utf8(bytes) {
+                Ok(decoded) => {
+                    bot.send_message(chat_id, format!("🔽 Base64 decoded:\n{}", decoded))
+                        .await?;
+                }
+                Err(_) => {
+                    bot.send_message(chat_id, "❌ Not valid UTF-8").await?;
+                }
+            },
+            Err(_) => {
+                bot.send_message(chat_id, "❌ Invalid Base64").await?;
+            }
+        },
+
+        Command::Rng(min, max) => {
+            if min == 0 || max == 0 || min > max {
+                bot.send_message(chat_id, "❌ Use: /rng 1 100 (min > 0, max > min)")
+                    .await?;
+            } else {
+                let num = rand::thread_rng().gen_range(min..=max);
+                bot.send_message(chat_id, format!("🎲 Random number: **{}**", num))
+                    .await?;
+            }
+        }
+
+        /*Command::Password(len) => {
+            if !(2..=128).contains(&len) {
+                bot.send_message(chat_id, "❌ Length must be 2–128").await?;
+            } else {
+                let chars: Vec<char> =
+                    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+-="
+                        .chars()
+                        .collect();
+                let mut rng = rand::thread_rng();
+                let pw: String = (0..len)
+                    .map(|_| chars[rng.gen_range(0..chars.len())])
+                    .collect();
+
+                bot.send_message(chat_id, format!("🔑 Password ({} chars):\n`{}`", len, pw))
+                    .await?;
+            }
+        }*/
+        Command::Password(len) => {
+            if !(2..=128).contains(&len) {
+                bot.send_message(chat_id, "❌ Length must be 2–128").await?;
+            } else {
+                let pw = {
+                    let chars: Vec<char> = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+-=".chars().collect();
+                    let mut rng = rand::thread_rng();
+                    (0..len)
+                        .map(|_| chars[rng.gen_range(0..chars.len())])
+                        .collect::<String>()
+                };
+
+                bot.send_message(chat_id, format!("🔑 Password ({} chars):\n`{}`", len, pw))
+                    .await?;
+            }
+        }
     }
     Ok(())
 }
@@ -76,8 +191,8 @@ async fn echo_text_handler(bot: Bot, msg: Message) -> ResponseResult<()> {
         if text.starts_with('/') {
             return Ok(()); // already handled by command branch
         }
-        bot.send_message(msg.chat.id, format!("📢 : {text}")).await?;
+        bot.send_message(msg.chat.id, format!("📢 : {text}"))
+            .await?;
     }
     Ok(())
 }
-
