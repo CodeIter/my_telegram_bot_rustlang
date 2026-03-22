@@ -193,7 +193,7 @@ async fn echo_text_handler(bot: Bot, msg: Message) -> ResponseResult<()> {
 
 async fn run_bc(expr: &str) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
     let mut child = TokioProcessCommand::new("bc")
-        .arg("-l") // enable math functions (sqrt, sin, etc.)
+        .arg("-l")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -201,18 +201,29 @@ async fn run_bc(expr: &str) -> Result<String, Box<dyn std::error::Error + Send +
 
     if let Some(mut stdin) = child.stdin.take() {
         stdin.write_all(expr.as_bytes()).await?;
-        stdin.write_all(b"\n").await?; // bc needs a newline
+        stdin.write_all(b"\n").await?;
         stdin.flush().await?;
+        // stdin is dropped here → EOF is sent to bc
     }
 
     let output = child.wait_with_output().await?;
-    if output.status.success() {
-        Ok(String::from_utf8_lossy(&output.stdout).into_owned())
+
+    let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
+    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+
+    if output.status.success() && stderr.is_empty() {
+        Ok(stdout)
     } else {
+        // Now catches both non-zero exit AND error messages on stderr (the common case)
         Err(format!(
-            "bc exited with code {}: {}",
-            output.status,
-            String::from_utf8_lossy(&output.stderr)
+            "bc error (exit {:?}): {}\nstdout was: {}",
+            output.status.code(),
+            if stderr.is_empty() {
+                "(no stderr)".to_string()
+            } else {
+                stderr
+            },
+            stdout.trim()
         )
         .into())
     }
@@ -282,6 +293,9 @@ mod tests {
     #[tokio::test]
     async fn bc_error_handling() {
         let res = run_bc("syntax error!").await;
-        assert!(res.is_err()); // bc should return non-zero
+        assert!(
+            res.is_err(),
+            "bc should return Err on invalid input (syntax error reported via stderr)"
+        );
     }
 }
