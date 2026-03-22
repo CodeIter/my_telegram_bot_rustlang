@@ -5,9 +5,11 @@ use teloxide::{
     dispatching::{UpdateHandler, dialogue::InMemStorage},
     filter_command,
     prelude::*,
-    types::Update,
+    sugar::request::RequestReplyExt,
+    types::{ParseMode, Update},
     utils::command::BotCommands,
-}; // ← for default_handler
+    utils::markdown::escape,
+};
 
 use base64::{Engine as _, engine::general_purpose};
 use percent_encoding::percent_decode_str;
@@ -85,65 +87,63 @@ enum Command {
 }
 
 async fn command_handler(bot: Bot, msg: Message, cmd: Command) -> ResponseResult<()> {
-    let chat_id = msg.chat.id;
-
     match cmd {
         Command::Help => {
-            bot.send_message(chat_id, Command::descriptions().to_string())
-                .await?;
+            reply_markdown(bot, msg, Command::descriptions().to_string()).await?;
         }
         Command::Start => {
-            bot.send_message(
-                chat_id,
-                "👋 Hello! I'm your Rust 🦀 bot powered by teloxide!\nJust type anything → I will echo it!\nUse /help for commands list",
+            reply_markdown(
+                bot,
+                msg,
+                "👋 Hello! I'm your Rust 🦀 bot powered by teloxide!\nJust type anything → I will echo it!\nUse /help for commands list".to_string(),
             )
             .await?;
         }
         Command::Echo(text) => {
-            bot.send_message(chat_id, format!("📢 : {text}")).await?;
+            reply_markdown(bot, msg, format!("📢 : {text}")).await?;
         }
 
         Command::UrlDecode(encoded) => {
             let decoded = percent_decode_str(&encoded).decode_utf8_lossy().to_string();
-            bot.send_message(chat_id, format!("🔓 Decoded URL:\n{}", decoded))
-                .await?;
+            reply_markdown(bot, msg, format!("🔓 Decoded URL:\n{}", decoded)).await?;
         }
 
         Command::TextBase64Encode(text) => {
             let encoded = general_purpose::STANDARD.encode(text.as_bytes());
-            bot.send_message(chat_id, format!("🔼 Base64 encoded:\n{}", encoded))
-                .await?;
+            reply_markdown(bot, msg, format!("🔼 Base64 encoded:\n{}", encoded)).await?;
         }
 
         Command::TextBase64Decode(encoded) => match general_purpose::STANDARD.decode(&encoded) {
             Ok(bytes) => match String::from_utf8(bytes) {
                 Ok(decoded) => {
-                    bot.send_message(chat_id, format!("🔽 Base64 decoded:\n{}", decoded))
-                        .await?;
+                    reply_markdown(bot, msg, format!("🔽 Base64 decoded:\n{}", decoded)).await?;
                 }
                 Err(_) => {
-                    bot.send_message(chat_id, "❌ Not valid UTF-8").await?;
+                    reply_markdown(bot, msg, "❌ Not valid UTF-8".to_string()).await?;
                 }
             },
             Err(_) => {
-                bot.send_message(chat_id, "❌ Invalid Base64").await?;
+                reply_markdown(bot, msg, "❌ Invalid Base64".to_string()).await?;
             }
         },
 
         Command::Rng(min, max) => {
             if min == 0 || max == 0 || min > max {
-                bot.send_message(chat_id, "❌ Use: /rng 1 100 (min > 0, max > min)")
-                    .await?;
+                reply_markdown(
+                    bot,
+                    msg,
+                    "❌ Use: /rng 1 100 (min > 0, max > min)".to_string(),
+                )
+                .await?;
             } else {
                 let num = rand::thread_rng().gen_range(min..=max);
-                bot.send_message(chat_id, format!("🎲 Random number: **{}**", num))
-                    .await?;
+                reply_markdown(bot, msg, format!("🎲 Random number: {}", num)).await?;
             }
         }
 
         Command::Password(len) => {
             if !(2..=128).contains(&len) {
-                bot.send_message(chat_id, "❌ Length must be 2–128").await?;
+                reply_markdown(bot, msg, "❌ Length must be 2–128".to_string()).await?;
             } else {
                 let pw = {
                     let chars: Vec<char> = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+-=".chars().collect();
@@ -153,24 +153,21 @@ async fn command_handler(bot: Bot, msg: Message, cmd: Command) -> ResponseResult
                         .collect::<String>()
                 };
 
-                bot.send_message(chat_id, format!("🔑 Password ({} chars):\n`{}`", len, pw))
-                    .await?;
+                reply_markdown(bot, msg, format!("🔑 Password ({} chars):\n{}", len, pw)).await?;
             }
         }
 
         Command::Bc(expr) => {
             if expr.trim().is_empty() {
-                bot.send_message(chat_id, "❌ Usage: /bc 2+2*3 or /bc sqrt(16)")
-                    .await?;
+                reply_markdown(bot, msg, "❌ Usage: /bc 2+2*3 or /bc sqrt(16)".to_string()).await?;
             } else {
                 match run_bc(&expr).await {
                     Ok(result) => {
-                        bot.send_message(chat_id, format!("📊 bc result:\n`{}`", result.trim()))
+                        reply_markdown(bot, msg, format!("📊 bc result:\n{}", result.trim()))
                             .await?;
                     }
                     Err(e) => {
-                        bot.send_message(chat_id, format!("❌ bc error: {}", e))
-                            .await?;
+                        reply_markdown(bot, msg, format!("❌ bc error: {}", e)).await?;
                     }
                 }
             }
@@ -185,10 +182,17 @@ async fn echo_text_handler(bot: Bot, msg: Message) -> ResponseResult<()> {
         if text.starts_with('/') {
             return Ok(()); // already handled by command branch
         }
-        bot.send_message(msg.chat.id, format!("📢 : {text}"))
-            .await?;
+        reply_markdown(bot, msg.clone(), format!("📢 : {text}")).await?;
     }
     Ok(())
+}
+
+async fn reply_markdown(bot: Bot, msg: Message, text: String) -> ResponseResult<()> {
+    bot.send_message(msg.chat.id, escape(&text))
+        .parse_mode(ParseMode::MarkdownV2)
+        .reply_to(msg.id)
+        .await
+        .map(|_| ())
 }
 
 async fn run_bc(expr: &str) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
