@@ -217,3 +217,71 @@ async fn run_bc(expr: &str) -> Result<String, Box<dyn std::error::Error + Send +
         .into())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn base64_roundtrip() {
+        let text = "Hello 🦀 Telegram Bot! 123";
+        let encoded = general_purpose::STANDARD.encode(text.as_bytes());
+        let decoded_bytes = general_purpose::STANDARD.decode(&encoded).unwrap();
+        let decoded = String::from_utf8(decoded_bytes).unwrap();
+        assert_eq!(decoded, text);
+    }
+
+    #[test]
+    fn url_decode_works() {
+        let encoded = "hello%20world%21%40";
+        let decoded = percent_decode_str(encoded).decode_utf8_lossy().into_owned();
+        assert_eq!(decoded, "hello world!@");
+    }
+
+    #[test]
+    fn rng_always_in_range() {
+        let min = 10u32;
+        let max = 20u32;
+        for _ in 0..50 {
+            let n = rand::thread_rng().gen_range(min..=max);
+            assert!(n >= min && n <= max);
+        }
+    }
+
+    #[test]
+    fn password_correct_length_and_charset() {
+        let len = 15u32;
+        let chars: Vec<char> =
+            "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+-="
+                .chars()
+                .collect();
+
+        let pw = {
+            let mut rng = rand::thread_rng();
+            (0..len)
+                .map(|_| chars[rng.gen_range(0..chars.len())])
+                .collect::<String>()
+        };
+
+        assert_eq!(pw.len(), len as usize);
+        assert!(pw.chars().all(|c| chars.contains(&c)));
+    }
+
+    #[tokio::test]
+    async fn bc_calculator_basic() {
+        let res = run_bc("2 + 2 * 3").await.unwrap();
+        assert_eq!(res.trim(), "8");
+    }
+
+    #[tokio::test]
+    async fn bc_calculator_with_sqrt() {
+        let res = run_bc("scale=0; sqrt(16)").await.unwrap();
+        assert_eq!(res.trim(), "4");
+    }
+
+    #[tokio::test]
+    async fn bc_error_handling() {
+        let res = run_bc("syntax error!").await;
+        assert!(res.is_err()); // bc should return non-zero
+    }
+}
