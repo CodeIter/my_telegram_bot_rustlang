@@ -1,0 +1,79 @@
+name: 🚀 Release Binaries
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            artifact: my_telegram_bot-${{ github.ref_name }}-linux-x86_64
+            suffix: ''
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact: my_telegram_bot-${{ github.ref_name }}-windows-x86_64.exe
+            suffix: '.exe'
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            artifact: my_telegram_bot-${{ github.ref_name }}-macos-x86_64
+            suffix: ''
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain (stable + components)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+          targets: ${{ matrix.target }}
+
+      - name: Cache cargo dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+
+      - name: 🔍 cargo fmt --check
+        run: cargo fmt --all -- --check
+
+      - name: 🧹 cargo clippy (deny warnings)
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+      - name: 🧪 cargo test
+        run: cargo test --all-targets --all-features --verbose
+
+      - name: Build release binary
+        run: cargo build --release --target ${{ matrix.target }} --verbose
+
+      - name: Strip symbols (Linux & macOS)
+        if: runner.os != 'Windows'
+        run: strip target/${{ matrix.target }}/release/my_telegram_bot${{ matrix.suffix }}
+
+      - name: Prepare artifact
+        shell: bash
+        run: |
+          cp "target/${{ matrix.target }}/release/my_telegram_bot${{ matrix.suffix }}" "${{ matrix.artifact }}"
+          if [[ "${{ runner.os }}" != "Windows" ]]; then
+            chmod +x "${{ matrix.artifact }}"
+          fi
+
+      - name: Upload binaries to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ matrix.artifact }}
+          tag_name: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
