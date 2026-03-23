@@ -280,12 +280,24 @@ async fn handle_ytdl(bot: Bot, msg: Message, url: String) -> ResponseResult<()> 
             let path = PathBuf::from(filepath);
 
             if path.exists() {
-                bot.send_video(msg.chat.id, InputFile::file(path.clone()))
+                // Try to send, always clean up afterwards
+                if let Err(e) = bot
+                    .send_video(msg.chat.id, InputFile::file(path.clone()))
                     .caption(format!("✅ Downloaded with yt-dlp 🦀\n🔗 {}", url))
                     .reply_to(msg.id)
+                    .await
+                {
+                    let _ = tokio::fs::remove_file(&path).await;
+                    reply_markdown(
+                        bot,
+                        msg,
+                        format!("⚠️ Upload timed out (file cleaned): {}", e),
+                    )
                     .await?;
+                    return Ok(());
+                }
 
-                let _ = tokio::fs::remove_file(&path).await; // clean up
+                let _ = tokio::fs::remove_file(&path).await; // success path
             } else {
                 reply_markdown(
                     bot,
@@ -347,12 +359,23 @@ async fn handle_ytdlmp3(bot: Bot, msg: Message, url: String) -> ResponseResult<(
             let path = PathBuf::from(filepath);
 
             if path.exists() {
-                bot.send_audio(msg.chat.id, InputFile::file(path.clone()))
+                if let Err(e) = bot
+                    .send_audio(msg.chat.id, InputFile::file(path.clone()))
                     .caption(format!("✅ MP3 Downloaded with yt-dlp 🦀\n🔗 {}", url))
                     .reply_to(msg.id)
+                    .await
+                {
+                    let _ = tokio::fs::remove_file(&path).await;
+                    reply_markdown(
+                        bot,
+                        msg,
+                        format!("⚠️ Upload timed out (file cleaned): {}", e),
+                    )
                     .await?;
+                    return Ok(());
+                }
 
-                let _ = tokio::fs::remove_file(&path).await; // clean up
+                let _ = tokio::fs::remove_file(&path).await;
             } else {
                 reply_markdown(
                     bot,
