@@ -6,7 +6,7 @@ use teloxide::{
     filter_command,
     prelude::*,
     sugar::request::RequestReplyExt,
-    types::{ParseMode, Update},
+    types::{InputFile, ParseMode, Update},
     utils::command::BotCommands,
     utils::markdown::escape,
 };
@@ -176,14 +176,35 @@ async fn command_handler(bot: Bot, msg: Message, cmd: Command) -> ResponseResult
     Ok(())
 }
 
-// ── Echo ANY plain text (no / needed) ───────────────────────────────
 async fn echo_text_handler(bot: Bot, msg: Message) -> ResponseResult<()> {
+    // 1. Sticker echo
+    if let Some(sticker) = msg.sticker() {
+        bot.send_sticker(msg.chat.id, InputFile::file_id(sticker.file.id.clone()))
+            .reply_to(msg.id)
+            .await
+            .map(|_| ())?;
+        return Ok(());
+    }
+
+    // 2. Photo echo
+    if let Some(photos) = msg.photo() {
+        if let Some(largest) = photos.last() {
+            bot.send_photo(msg.chat.id, InputFile::file_id(largest.file.id.clone()))
+                .reply_to(msg.id)
+                .await
+                .map(|_| ())?;
+            return Ok(());
+        }
+    }
+
+    // 3. Text echo
     if let Some(text) = msg.text() {
         if text.starts_with('/') {
-            return Ok(()); // already handled by command branch
+            return Ok(()); // command already handled
         }
         reply_markdown(bot, msg.clone(), format!("📢 : {text}")).await?;
     }
+
     Ok(())
 }
 
