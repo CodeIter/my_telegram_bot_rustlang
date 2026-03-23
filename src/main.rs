@@ -89,6 +89,9 @@ enum Command {
 
     #[command(description = "/ytdl <url> → download & send video with yt-dlp")]
     Ytdl(String),
+
+    #[command(description = "/ytdlmp3 <url> → download & send as MP3 with yt-dlp")]
+    YtdlMp3(String),
 }
 
 async fn command_handler(bot: Bot, msg: Message, cmd: Command) -> ResponseResult<()> {
@@ -180,6 +183,10 @@ async fn command_handler(bot: Bot, msg: Message, cmd: Command) -> ResponseResult
 
         Command::Ytdl(url) => {
             handle_ytdl(bot, msg, url).await?;
+        }
+
+        Command::YtdlMp3(url) => {
+            handle_ytdlmp3(bot, msg, url).await?;
         }
     }
     Ok(())
@@ -307,6 +314,74 @@ async fn run_yt_dlp(
         .arg("bestvideo+bestaudio/best")
         .arg("--merge-output-format")
         .arg("mp4")
+        .arg("-o")
+        .arg(output)
+        .arg(url)
+        .spawn()?;
+
+    let output = child.wait_with_output().await?;
+    if output.status.success() {
+        Ok(())
+    } else {
+        Err(format!("yt-dlp exit code: {:?}", output.status.code()).into())
+    }
+}
+
+async fn handle_ytdlmp3(bot: Bot, msg: Message, url: String) -> ResponseResult<()> {
+    if url.trim().is_empty() || !url.starts_with("http") {
+        reply_markdown(
+            bot,
+            msg,
+            "❌ Usage: /ytdlmp3 https://youtu.be/xxx or full YouTube link".to_string(),
+        )
+        .await?;
+        return Ok(());
+    }
+
+    let id: u64 = rand::thread_rng().r#gen::<u64>();
+    let output_template = format!("ytdlmp3_{}.%(ext)s", id);
+
+    match run_yt_dlp_mp3(&url, &output_template).await {
+        Ok(_) => {
+            let filepath = format!("ytdlmp3_{}.mp3", id);
+            let path = PathBuf::from(filepath);
+
+            if path.exists() {
+                bot.send_audio(msg.chat.id, InputFile::file(path.clone()))
+                    .caption(format!("✅ MP3 Downloaded with yt-dlp 🦀\n🔗 {}", url))
+                    .reply_to(msg.id)
+                    .await?;
+
+                let _ = tokio::fs::remove_file(&path).await; // clean up
+            } else {
+                reply_markdown(
+                    bot,
+                    msg,
+                    "❌ Downloaded but file not found (maybe no audio)".to_string(),
+                )
+                .await?;
+            }
+        }
+        Err(e) => {
+            reply_markdown(bot, msg, format!("❌ yt-dlp failed: {}", e)).await?;
+        }
+    }
+    Ok(())
+}
+
+async fn run_yt_dlp_mp3(
+    url: &str,
+    output: &str,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let child = TokioProcessCommand::new("yt-dlp")
+        .arg("--quiet")
+        .arg("--no-warnings")
+        .arg("--no-playlist")
+        .arg("-x")
+        .arg("--audio-format")
+        .arg("mp3")
+        .arg("--audio-quality")
+        .arg("0")
         .arg("-o")
         .arg(output)
         .arg(url)
