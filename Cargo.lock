@@ -882,7 +882,7 @@ dependencies = [
 
 [[package]]
 name = "my_telegram_bot"
-version = "1.4.1"
+version = "1.5.0"
 dependencies = [
  "base64",
  "dotenvy",
