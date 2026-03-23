@@ -221,14 +221,14 @@ async fn echo_text_handler(bot: Bot, msg: Message) -> ResponseResult<()> {
     }
 
     // 4. Photo echo
-    if let Some(photos) = msg.photo() {
-        if let Some(largest) = photos.last() {
-            bot.send_photo(msg.chat.id, InputFile::file_id(largest.file.id.clone()))
-                .reply_to(msg.id)
-                .await
-                .map(|_| ())?;
-            return Ok(());
-        }
+    if let Some(photos) = msg.photo()
+        && let Some(largest) = photos.last()
+    {
+        bot.send_photo(msg.chat.id, InputFile::file_id(largest.file.id.clone()))
+            .reply_to(msg.id)
+            .await
+            .map(|_| ())?;
+        return Ok(());
     }
 
     // 5. Voice message echo
