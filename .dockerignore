@@ -15,6 +15,7 @@ target/
 logs/
 *.tmp
 getfiles.txt
+my_telegram_bot
 
 # Development & editor files
 .vscode/
