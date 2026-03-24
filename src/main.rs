@@ -32,6 +32,12 @@ async fn main() {
 
     let bot = Bot::from_env();
 
+    // Register commands with Telegram so they appear in the "/" menu when user types /
+    match bot.set_my_commands(Command::bot_commands()).await {
+        Ok(_) => log::info!("✅ Bot commands registered (visible in Telegram / menu)"),
+        Err(e) => log::error!("Failed to set bot commands: {}", e),
+    }
+
     Dispatcher::builder(bot, schema())
         .dependencies(dptree::deps![InMemStorage::<()>::new()])
         .default_handler(|upd: Arc<Update>| async move {
