@@ -1,0 +1,39 @@
+# Git
+.git
+.gitignore
+.github
+
+# Rust build artifacts
+target/
+
+# Environment & secrets
+.env
+.env.*
+
+# Logs & temporary files
+*.log
+logs/
+*.tmp
+getfiles.txt
+
+# Development & editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+getfiles.sh
+
+# Docker & compose cache
+docker-compose.override.yml
+.docker/
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Tests
+tests/
+
+# Documentation
+README.md
+LICENSE
