@@ -21,6 +21,9 @@ use tokio::process::Command as TokioProcessCommand;
 
 use std::path::PathBuf;
 
+use image::Luma;
+use qrcode::QrCode;
+
 #[tokio::main]
 async fn main() {
     dotenv().ok();
@@ -92,6 +95,9 @@ enum Command {
 
     #[command(description = "/ytdlmp3 <url> → download & send as MP3 with yt-dlp")]
     YtdlMp3(String),
+
+    #[command(description = "/textqr <text> → generate QR code image")]
+    TextQr(String),
 }
 
 async fn command_handler(bot: Bot, msg: Message, cmd: Command) -> ResponseResult<()> {
@@ -187,6 +193,10 @@ async fn command_handler(bot: Bot, msg: Message, cmd: Command) -> ResponseResult
 
         Command::YtdlMp3(url) => {
             handle_ytdlmp3(bot, msg, url).await?;
+        }
+
+        Command::TextQr(text) => {
+            handle_textqr(bot, msg, text).await?;
         }
     }
     Ok(())
@@ -416,6 +426,69 @@ async fn run_yt_dlp_mp3(
     } else {
         Err(format!("yt-dlp exit code: {:?}", output.status.code()).into())
     }
+}
+
+async fn handle_textqr(bot: Bot, msg: Message, text: String) -> ResponseResult<()> {
+    let trimmed = text.trim();
+    if trimmed.is_empty() {
+        reply_markdown(
+            bot,
+            msg,
+            "❌ Usage: /textqr your text here (text is required)".to_string(),
+        )
+        .await?;
+        return Ok(());
+    }
+
+    let id: u64 = rand::thread_rng().r#gen::<u64>();
+    let filepath = format!("textqr_{}.png", id);
+    let path = PathBuf::from(filepath);
+
+    match QrCode::new(trimmed.as_bytes()) {
+        Ok(code) => {
+            let img = code
+                .render::<Luma<u8>>()
+                .module_dimensions(20, 20)
+                .quiet_zone(true)
+                .build();
+
+            if let Err(e) = img.save(&path) {
+                reply_markdown(bot, msg, format!("❌ Failed to save QR image: {}", e)).await?;
+                return Ok(());
+            }
+
+            let caption = format!(
+                "✅ QR Code generated with Rust 🦀\n🔤 {}",
+                if trimmed.len() > 200 {
+                    format!("{}...", &trimmed[..200])
+                } else {
+                    trimmed.to_string()
+                }
+            );
+
+            if let Err(e) = bot
+                .send_photo(msg.chat.id, InputFile::file(path.clone()))
+                .caption(caption)
+                .reply_to(msg.id)
+                .await
+            {
+                let _ = tokio::fs::remove_file(&path).await;
+                reply_markdown(bot, msg, format!("⚠️ Upload failed (file cleaned): {}", e)).await?;
+                return Ok(());
+            }
+
+            let _ = tokio::fs::remove_file(&path).await; // success cleanup
+        }
+        Err(e) => {
+            reply_markdown(
+                bot,
+                msg,
+                format!("❌ Failed to generate QR: {} (text may be too long)", e),
+            )
+            .await?;
+        }
+    }
+    Ok(())
 }
 
 async fn reply_markdown(bot: Bot, msg: Message, text: String) -> ResponseResult<()> {
