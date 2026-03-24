@@ -16,6 +16,7 @@ logs/
 *.tmp
 getfiles.txt
 my_telegram_bot
+nohup.out
 
 # Development & editor files
 .vscode/
