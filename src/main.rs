@@ -8,7 +8,7 @@ use teloxide::{
     sugar::request::RequestReplyExt,
     types::{InputFile, ParseMode, Update},
     utils::command::BotCommands,
-    utils::markdown::escape,
+    //utils::markdown::escape,
 };
 
 use base64::{Engine as _, engine::general_purpose};
@@ -641,12 +641,80 @@ async fn handle_gemini(bot: Bot, msg: Message, prompt: String, model: &str) -> R
     Ok(())
 }
 
+fn markdown_v2_escape(text: &str) -> String {
+    text.chars()
+        .map(|c| match c {
+            '\\' => "\\\\".to_string(),
+            '[' => "\\[".to_string(),
+            ']' => "\\]".to_string(),
+            '(' => "\\(".to_string(),
+            ')' => "\\)".to_string(),
+            '~' => "\\~".to_string(),
+            '>' => "\\>".to_string(),
+            '#' => "\\#".to_string(),
+            '+' => "\\+".to_string(),
+            '-' => "\\-".to_string(),
+            '|' => "\\|".to_string(),
+            '{' => "\\{".to_string(),
+            '}' => "\\}".to_string(),
+            '.' => "\\.".to_string(),
+            '=' => "\\=".to_string(),
+            '!' => "\\!".to_string(),
+            '*' => "\\*".to_string(),
+            '_' => "\\_".to_string(),
+            '`' => "\\`".to_string(),
+            _ => c.to_string(),
+        })
+        .collect()
+}
+
+const MAX_MESSAGE_LENGTH: usize = 4096;
+fn split_long_message(text: &str) -> Vec<String> {
+    let mut chunks = Vec::new();
+    let mut start = 0usize;
+    while start < text.len() {
+        let mut end = (start + MAX_MESSAGE_LENGTH).min(text.len());
+        // Smart split: prefer paragraph breaks, then newlines, then sentences, then words
+        if end < text.len() {
+            if let Some(pos) = text[start..end].rfind("\n\n") {
+                end = start + pos + 2;
+            } else if let Some(pos) = text[start..end].rfind('\n') {
+                end = start + pos + 1;
+            } else if let Some(pos) = text[start..end].rfind(". ") {
+                end = start + pos + 2;
+            } else if let Some(pos) = text[start..end].rfind(' ') {
+                end = start + pos + 1;
+            }
+        }
+        let chunk = text[start..end].to_string();
+        if !chunk.trim().is_empty() {
+            chunks.push(chunk);
+        }
+        start = end;
+    }
+    chunks
+}
+
 async fn reply_markdown(bot: Bot, msg: Message, text: String) -> ResponseResult<()> {
-    bot.send_message(msg.chat.id, escape(&text))
-        .parse_mode(ParseMode::MarkdownV2)
-        .reply_to(msg.id)
-        .await
-        .map(|_| ())
+    let escaped = markdown_v2_escape(&text);
+    if escaped.len() <= MAX_MESSAGE_LENGTH {
+        bot.send_message(msg.chat.id, escaped)
+            .parse_mode(ParseMode::MarkdownV2)
+            .reply_to(msg.id)
+            .await
+            .map(|_| ())?;
+        return Ok(());
+    }
+    // Message is too long → split and send as multiple replies (all with MarkdownV2)
+    for chunk in split_long_message(&escaped) {
+        let _ = bot
+            .send_message(msg.chat.id, chunk)
+            .parse_mode(ParseMode::MarkdownV2)
+            .reply_to(msg.id)
+            .await;
+        // We intentionally ignore per-chunk errors so the rest of the text still gets delivered
+    }
+    Ok(())
 }
 
 async fn run_bc(expr: &str) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
