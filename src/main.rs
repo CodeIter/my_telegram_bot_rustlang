@@ -698,21 +698,39 @@ fn split_long_message(text: &str) -> Vec<String> {
 async fn reply_markdown(bot: Bot, msg: Message, text: String) -> ResponseResult<()> {
     let escaped = markdown_v2_escape(&text);
     if escaped.len() <= MAX_MESSAGE_LENGTH {
-        bot.send_message(msg.chat.id, escaped)
+        if let Err(e) = bot
+            .send_message(msg.chat.id, escaped)
             .parse_mode(ParseMode::MarkdownV2)
             .reply_to(msg.id)
             .await
-            .map(|_| ())?;
+        {
+            log::warn!(
+                "MarkdownV2 failed for short message, falling back to plain text: {}",
+                e
+            );
+            let _ = bot.send_message(msg.chat.id, text).reply_to(msg.id).await;
+        }
         return Ok(());
     }
-    // Message is too long → split and send as multiple replies (all with MarkdownV2)
+
+    // Message is too long → split and send as multiple replies
+    // (try MarkdownV2 per chunk, fallback to plain text if it fails)
     for chunk in split_long_message(&escaped) {
-        let _ = bot
-            .send_message(msg.chat.id, chunk)
+        if let Err(e) = bot
+            .send_message(msg.chat.id, chunk.as_str())
             .parse_mode(ParseMode::MarkdownV2)
             .reply_to(msg.id)
-            .await;
-        // We intentionally ignore per-chunk errors so the rest of the text still gets delivered
+            .await
+        {
+            log::warn!(
+                "MarkdownV2 failed for long message chunk, falling back to plain text: {}",
+                e
+            );
+            let _ = bot
+                .send_message(msg.chat.id, chunk.as_str())
+                .reply_to(msg.id)
+                .await;
+        }
     }
     Ok(())
 }
