@@ -641,31 +641,34 @@ async fn handle_gemini(bot: Bot, msg: Message, prompt: String, model: &str) -> R
     Ok(())
 }
 
+/// Escapes **any** text for safe use with Telegram `MarkdownV2`.
 fn markdown_v2_escape(text: &str) -> String {
-    text.chars()
-        .map(|c| match c {
-            '\\' => "\\\\".to_string(),
-            '[' => "\\[".to_string(),
-            ']' => "\\]".to_string(),
-            '(' => "\\(".to_string(),
-            ')' => "\\)".to_string(),
-            '~' => "\\~".to_string(),
-            '>' => "\\>".to_string(),
-            '#' => "\\#".to_string(),
-            '+' => "\\+".to_string(),
-            '-' => "\\-".to_string(),
-            '|' => "\\|".to_string(),
-            '{' => "\\{".to_string(),
-            '}' => "\\}".to_string(),
-            '.' => "\\.".to_string(),
-            '=' => "\\=".to_string(),
-            '!' => "\\!".to_string(),
-            '*' => "\\*".to_string(),
-            '_' => "\\_".to_string(),
-            '`' => "\\`".to_string(),
-            _ => c.to_string(),
-        })
-        .collect()
+    let mut escaped = String::with_capacity(text.len() * 2);
+    for c in text.chars() {
+        match c {
+            '\\' => escaped.push_str("\\\\"),
+            '[' => escaped.push_str("\\["),
+            ']' => escaped.push_str("\\]"),
+            '(' => escaped.push_str("\\("),
+            ')' => escaped.push_str("\\)"),
+            '~' => escaped.push_str("\\~"),
+            '>' => escaped.push_str("\\>"),
+            '#' => escaped.push_str("\\#"),
+            '+' => escaped.push_str("\\+"),
+            '-' => escaped.push_str("\\-"),
+            '=' => escaped.push_str("\\="),
+            '|' => escaped.push_str("\\|"),
+            '{' => escaped.push_str("\\{"),
+            '}' => escaped.push_str("\\}"),
+            '.' => escaped.push_str("\\."),
+            '!' => escaped.push_str("\\!"),
+            '`' => escaped.push_str("\\`"),
+            '*' => escaped.push_str("\\*"),
+            '_' => escaped.push_str("\\_"),
+            _ => escaped.push(c),
+        }
+    }
+    escaped
 }
 
 const MAX_MESSAGE_LENGTH: usize = 4096;
