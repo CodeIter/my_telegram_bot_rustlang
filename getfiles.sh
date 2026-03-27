@@ -3,7 +3,7 @@
 {
 tree -a -I .git --gitignore
 echo
-for f in ./.env.example ./Cargo.toml ./**/*.rs "${@}" ; do
+for f in ./.env.example ./Cargo.toml ./src/**/*.rs "${@}" ; do
   echo "-------------------------------------------------------------------"
   echo "File: $f"
   echo "-------------------------------------------------------------------"
