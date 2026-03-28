@@ -7,16 +7,19 @@ use teloxide::{
     prelude::*,
     types::Update,
     utils::command::BotCommands,
-    //utils::markdown::escape,
 };
+
+use sqlx::SqlitePool;
 
 mod commands;
 mod handlers;
+mod init_db;
 mod utils;
 
 use crate::commands::Command;
 use crate::handlers::command_handler::command_handler;
 use crate::handlers::echo_text_handler::echo_text_handler;
+use crate::init_db::init_db;
 
 #[tokio::main]
 async fn main() {
@@ -26,13 +29,21 @@ async fn main() {
 
     let bot = Bot::from_env();
 
+    let pool = match init_db().await {
+        Ok(p) => p,
+        Err(e) => {
+            log::error!("❌ Failed to initialize database: {}", e);
+            std::process::exit(1);
+        }
+    };
+
     match bot.set_my_commands(Command::bot_commands()).await {
         Ok(_) => log::info!("✅ Bot commands registered (visible in Telegram / menu)"),
         Err(e) => log::error!("Failed to set bot commands: {}", e),
     }
 
     Dispatcher::builder(bot, schema())
-        .dependencies(dptree::deps![InMemStorage::<()>::new()])
+        .dependencies(dptree::deps![InMemStorage::<()>::new(), pool])
         .default_handler(|upd: Arc<Update>| async move {
             log::warn!("Unhandled update: {upd:#?}");
         })
@@ -46,10 +57,14 @@ fn schema() -> UpdateHandler<RequestError> {
     dptree::entry().branch(
         Update::filter_message()
             .branch(filter_command::<Command, _>().endpoint(
-                |bot: Bot, msg: Message, cmd: Command| async move {
-                    command_handler(bot, msg, cmd).await
+                |bot: Bot, msg: Message, cmd: Command, pool: SqlitePool| async move {
+                    command_handler(bot, msg, cmd, pool).await
                 },
             ))
-            .branch(Update::filter_message().endpoint(echo_text_handler)),
+            .branch(Update::filter_message().endpoint(
+                |bot: Bot, msg: Message, pool: SqlitePool| async move {
+                    echo_text_handler(bot, msg, pool).await
+                },
+            )),
     )
 }

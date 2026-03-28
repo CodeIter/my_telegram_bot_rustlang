@@ -5,6 +5,8 @@ use serde_json::json;
 use std::env;
 use teloxide::{Bot, prelude::*, types::Message};
 
+use sqlx::SqlitePool;
+
 #[derive(Deserialize)]
 struct NvidiaChatResponse {
     choices: Vec<NvidiaChoice>,
@@ -25,6 +27,7 @@ pub async fn handle_glm5(
     msg: Message,
     prompt: String,
     enable_thinking: bool,
+    pool: SqlitePool,
 ) -> ResponseResult<()> {
     let trimmed = prompt.trim();
     if trimmed.is_empty() {
@@ -37,6 +40,7 @@ pub async fn handle_glm5(
             bot,
             msg,
             format!("❌ Usage: /{cmd_name} <your prompt here> (prompt is required)"),
+            &pool,
         )
         .await?;
         return Ok(());
@@ -49,6 +53,7 @@ pub async fn handle_glm5(
                 bot,
                 msg,
                 "❌ NVIDIA_API_KEY environment variable is not set.\nPlease add it to your .env file and restart the bot.".to_string(),
+            &pool,
             )
             .await?;
             return Ok(());
@@ -90,6 +95,7 @@ pub async fn handle_glm5(
                 bot,
                 msg,
                 format!("❌ Network error while contacting NVIDIA API: {}", e),
+                &pool,
             )
             .await?;
             return Ok(());
@@ -106,6 +112,7 @@ pub async fn handle_glm5(
             bot,
             msg,
             format!("❌ NVIDIA API error (HTTP {}): {}", status, err_text),
+            &pool,
         )
         .await?;
         return Ok(());
@@ -118,6 +125,7 @@ pub async fn handle_glm5(
                 bot,
                 msg,
                 format!("❌ Failed to parse NVIDIA API response: {}", e),
+                &pool,
             )
             .await?;
             return Ok(());
@@ -140,6 +148,7 @@ pub async fn handle_glm5(
         bot,
         msg,
         format!("🤖 {}:\n{}", model_display, response_text),
+        &pool,
     )
     .await?;
 

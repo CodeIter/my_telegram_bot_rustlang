@@ -9,12 +9,21 @@ use teloxide::{
 };
 use tokio::fs;
 
-pub async fn handle_ytdlmp3(bot: Bot, msg: Message, url: String) -> ResponseResult<()> {
+use crate::utils::{save_message::save_message, upsert_user::upsert_user_and_get_id};
+use sqlx::SqlitePool;
+
+pub async fn handle_ytdlmp3(
+    bot: Bot,
+    msg: Message,
+    url: String,
+    pool: SqlitePool,
+) -> ResponseResult<()> {
     if url.trim().is_empty() || !url.starts_with("http") {
         reply_markdown(
             bot,
             msg,
             "❌ Usage: /ytdlmp3 https://youtu.be/xxx or full YouTube link".to_string(),
+            &pool,
         )
         .await?;
         return Ok(());
@@ -40,9 +49,24 @@ pub async fn handle_ytdlmp3(bot: Bot, msg: Message, url: String) -> ResponseResu
                         bot,
                         msg,
                         format!("⚠️ Upload timed out (file cleaned): {}", e),
+                        &pool,
                     )
                     .await?;
                     return Ok(());
+                } else {
+                    // success → save bot media
+                    if let Some(user) = &msg.from {
+                        if let Ok(internal_id) = upsert_user_and_get_id(&pool, user).await {
+                            let _ = save_message(
+                                &pool,
+                                internal_id,
+                                "<sent> file audio".to_string(),
+                                true,
+                                "audio",
+                            )
+                            .await;
+                        }
+                    }
                 }
 
                 let _ = fs::remove_file(&path).await;
@@ -51,12 +75,13 @@ pub async fn handle_ytdlmp3(bot: Bot, msg: Message, url: String) -> ResponseResu
                     bot,
                     msg,
                     "❌ Downloaded but file not found (maybe no audio)".to_string(),
+                    &pool,
                 )
                 .await?;
             }
         }
         Err(e) => {
-            reply_markdown(bot, msg, format!("❌ yt-dlp failed: {}", e)).await?;
+            reply_markdown(bot, msg, format!("❌ yt-dlp failed: {}", e), &pool).await?;
         }
     }
     Ok(())

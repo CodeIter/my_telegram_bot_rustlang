@@ -4,6 +4,8 @@ getfiles.txt
 my_telegram_bot
 nohup.out
 *.tmp
+*.sqlite
+*.db
 
 # Created by https://www.toptal.com/developers/gitignore/api/rust
 # Edit at https://www.toptal.com/developers/gitignore?templates=rust

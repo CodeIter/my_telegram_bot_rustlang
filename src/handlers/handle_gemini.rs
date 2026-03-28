@@ -5,6 +5,8 @@ use serde_json::json;
 use std::env;
 use teloxide::{Bot, prelude::*, types::Message};
 
+use sqlx::SqlitePool;
+
 #[derive(Deserialize)]
 struct GeminiResponse {
     candidates: Vec<Candidate>,
@@ -30,6 +32,7 @@ pub async fn handle_gemini(
     msg: Message,
     prompt: String,
     model: &str,
+    pool: SqlitePool,
 ) -> ResponseResult<()> {
     let trimmed = prompt.trim();
     if trimmed.is_empty() {
@@ -42,6 +45,7 @@ pub async fn handle_gemini(
             bot,
             msg,
             format!("❌ Usage: /{cmd_name} <your prompt here> (prompt is required)"),
+            &pool,
         )
         .await?;
         return Ok(());
@@ -54,6 +58,7 @@ pub async fn handle_gemini(
                 bot,
                 msg,
                 "❌ GEMINI_API_KEY environment variable is not set.\nPlease add it to your .env file and restart the bot.".to_string(),
+                &pool,
             )
             .await?;
             return Ok(());
@@ -80,6 +85,7 @@ pub async fn handle_gemini(
                 bot,
                 msg,
                 format!("❌ Network error while contacting Gemini API: {}", e),
+                &pool,
             )
             .await?;
             return Ok(());
@@ -96,6 +102,7 @@ pub async fn handle_gemini(
             bot,
             msg,
             format!("❌ Gemini API error (HTTP {}): {}", status, err_text),
+            &pool,
         )
         .await?;
         return Ok(());
@@ -108,6 +115,7 @@ pub async fn handle_gemini(
                 bot,
                 msg,
                 format!("❌ Failed to parse Gemini API response: {}", e),
+                &pool,
             )
             .await?;
             return Ok(());
@@ -131,6 +139,7 @@ pub async fn handle_gemini(
         bot,
         msg,
         format!("🤖 {}:\n{}", model_display, response_text),
+        &pool,
     )
     .await?;
 

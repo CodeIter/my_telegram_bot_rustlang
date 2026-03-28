@@ -8,8 +8,13 @@ use teloxide::utils::command::BotCommands;
 pub enum Command {
     #[command(description = "Display this help text.")]
     Help,
+
     #[command(description = "Say hello!")]
     Start,
+
+    #[command(description = "/clear → delete all your conversation history")]
+    Clear,
+
     #[command(description = "Echo any text (but we also echo without command)")]
     Echo(String),
 
