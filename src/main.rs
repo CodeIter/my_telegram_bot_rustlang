@@ -17,8 +17,8 @@ mod init_db;
 mod utils;
 
 use crate::commands::Command;
+use crate::handlers::any_message_handler::any_message_handler;
 use crate::handlers::command_handler::command_handler;
-use crate::handlers::echo_text_handler::echo_text_handler;
 use crate::init_db::init_db;
 
 #[tokio::main]
@@ -63,7 +63,7 @@ fn schema() -> UpdateHandler<RequestError> {
             ))
             .branch(Update::filter_message().endpoint(
                 |bot: Bot, msg: Message, pool: SqlitePool| async move {
-                    echo_text_handler(bot, msg, pool).await
+                    any_message_handler(bot, msg, pool).await
                 },
             )),
     )

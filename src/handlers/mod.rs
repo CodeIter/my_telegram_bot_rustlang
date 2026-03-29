@@ -1,5 +1,5 @@
+pub mod any_message_handler;
 pub mod command_handler;
-pub mod echo_text_handler;
 pub mod handle_clear;
 pub mod handle_gemini;
 pub mod handle_glm5;

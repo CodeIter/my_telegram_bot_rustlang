@@ -9,7 +9,7 @@ use teloxide::{
     types::{InputFile, Message},
 };
 
-pub async fn echo_text_handler(bot: Bot, msg: Message, pool: SqlitePool) -> ResponseResult<()> {
+pub async fn any_message_handler(bot: Bot, msg: Message, pool: SqlitePool) -> ResponseResult<()> {
     // Helper to save media placeholder
     async fn save_media(pool: &SqlitePool, msg: &Message, is_bot: bool, file_type: &str) {
         if let Some(user) = &msg.from {
