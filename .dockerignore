@@ -17,6 +17,8 @@ logs/
 getfiles.txt
 my_telegram_bot
 nohup.out
+*.db
+*.sqlite
 
 # Development & editor files
 .vscode/
