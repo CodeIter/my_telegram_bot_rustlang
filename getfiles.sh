@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+shopt -s globstar
+
 {
 tree -a -I .git --gitignore
 echo
