@@ -10,11 +10,12 @@ use teloxide::{
 };
 
 pub async fn any_message_handler(bot: Bot, msg: Message, pool: SqlitePool) -> ResponseResult<()> {
+
     // Helper to save media placeholder
     async fn save_media(pool: &SqlitePool, msg: &Message, is_bot: bool, file_type: &str) {
         if let Some(user) = &msg.from {
             if let Ok(internal_id) = upsert_user_and_get_id(pool, user).await {
-                let prefix = if is_bot { "<sent>" } else { "<received>" };
+                let prefix = if is_bot { "sent" } else { "received" };
                 let content = format!("{} file {}", prefix, file_type);
                 let _ = save_message(pool, internal_id, content, is_bot, file_type).await;
             }
