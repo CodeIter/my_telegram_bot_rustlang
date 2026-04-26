@@ -12,7 +12,7 @@ pub enum Command {
     #[command(description = "Say hello!")]
     Start,
 
-    #[command(description = "/clear → delete all your conversation history")]
+    #[command(description = "/clear → delete all your conversation history, clear ai context")]
     Clear,
 
     #[command(description = "Echo any text (but we also echo without command)")]
