@@ -21,13 +21,10 @@ pub async fn command_handler(
     cmd: Command,
     pool: SqlitePool,
 ) -> ResponseResult<()> {
-
     // ── Save incoming user command/message ──
     if let Some(user) = &msg.from {
         if let Ok(internal_id) = upsert_user_and_get_id(&pool, user).await {
-            let content = msg
-                .text()
-                .map_or_else(|| "".to_string(), |t| t.to_string());
+            let content = msg.text().map_or_else(|| "".to_string(), |t| t.to_string());
             let _ = save_message(&pool, internal_id, content, false, "text").await;
         }
     }
