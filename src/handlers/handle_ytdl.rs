@@ -63,7 +63,7 @@ pub async fn handle_ytdl(
                         let _ = save_message(
                             &pool,
                             internal_id,
-                            "<sent> file video".to_string(),
+                            "sent file video".to_string(),
                             true,
                             "video",
                         )

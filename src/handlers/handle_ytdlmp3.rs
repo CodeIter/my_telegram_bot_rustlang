@@ -60,7 +60,7 @@ pub async fn handle_ytdlmp3(
                             let _ = save_message(
                                 &pool,
                                 internal_id,
-                                "<sent> file audio".to_string(),
+                                "sent file audio".to_string(),
                                 true,
                                 "audio",
                             )

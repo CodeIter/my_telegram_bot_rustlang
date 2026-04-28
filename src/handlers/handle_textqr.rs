@@ -88,7 +88,7 @@ pub async fn handle_textqr(
                     let _ = save_message(
                         &pool,
                         internal_id,
-                        "<sent> file photo".to_string(),
+                        "sent file photo".to_string(),
                         true,
                         "photo",
                     )
