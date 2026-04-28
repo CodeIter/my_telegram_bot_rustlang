@@ -15,7 +15,7 @@ pub enum Command {
     #[command(description = "/clear → delete all your conversation history, clear ai context")]
     Clear,
 
-    #[command(description = "Echo any text (but we also echo without command)")]
+    #[command(description = "Echo any text")]
     Echo(String),
 
     #[command(description = "/urldecode <encoded> → decode URL")]
