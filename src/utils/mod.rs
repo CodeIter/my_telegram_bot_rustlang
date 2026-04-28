@@ -1,4 +1,5 @@
 pub mod clear_conversation;
+pub mod get_conversation_history;
 pub mod markdown_v2_escape;
 pub mod message_split;
 pub mod reply_markdown;

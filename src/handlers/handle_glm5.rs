@@ -1,11 +1,18 @@
+use crate::utils::get_conversation_history::get_conversation_history;
 use crate::utils::reply_markdown::reply_markdown;
+use crate::utils::upsert_user::upsert_user_and_get_id;
 use reqwest;
 use serde::Deserialize;
-use serde_json::json;
+use serde_json::{Value, json};
+use sqlx::SqlitePool;
 use std::env;
 use teloxide::{Bot, prelude::*, types::Message};
 
-use sqlx::SqlitePool;
+/// Maximum number of past messages sent as context to the model.
+/// n rows ≈ n/2 user/assistant turns.
+const HISTORY_LIMIT: i64 = 100;
+
+// ── NVIDIA / OpenAI-compatible response types
 
 #[derive(Deserialize)]
 struct NvidiaChatResponse {
@@ -21,6 +28,8 @@ struct NvidiaChoice {
 struct NvidiaMessage {
     content: String,
 }
+
+// ── Handler
 
 pub async fn handle_glm5(
     bot: Bot,
@@ -52,25 +61,29 @@ pub async fn handle_glm5(
             reply_markdown(
                 bot,
                 msg,
-                "❌ NVIDIA_API_KEY environment variable is not set.\nPlease add it to your .env file and restart the bot.".to_string(),
-            &pool,
+                "❌ NVIDIA_API_KEY environment variable is not set.\n\
+                 Please add it to your .env file and restart the bot."
+                    .to_string(),
+                &pool,
             )
             .await?;
             return Ok(());
         }
     };
 
+    // ── Build messages[] from conversation history
+    let mut messages: Vec<Value> = build_openai_history(&pool, &msg, HISTORY_LIMIT).await;
+
+    // Append the current user prompt as the final turn.
+    messages.push(json!({ "role": "user", "content": trimmed }));
+
+    // ── Call NVIDIA API
     let client = reqwest::Client::new();
     let url = "https://integrate.api.nvidia.com/v1/chat/completions";
 
     let body = json!({
         "model": "z-ai/glm5",
-        "messages": [
-            {
-                "role": "user",
-                "content": trimmed
-            }
-        ],
+        "messages": messages,
         "temperature": 1,
         "top_p": 1,
         "max_tokens": 16384,
@@ -104,10 +117,10 @@ pub async fn handle_glm5(
 
     if !res.status().is_success() {
         let status = res.status();
-        let err_text = match res.text().await {
-            Ok(text) => text,
-            Err(_) => "Unknown error".to_string(),
-        };
+        let err_text = res
+            .text()
+            .await
+            .unwrap_or_else(|_| "Unknown error".to_string());
         reply_markdown(
             bot,
             msg,
@@ -135,7 +148,7 @@ pub async fn handle_glm5(
     let response_text = nvidia_resp
         .choices
         .first()
-        .map(|choice| choice.message.content.as_str())
+        .map(|c| c.message.content.as_str())
         .unwrap_or("No response text from GLM-5.");
 
     let model_display = if enable_thinking {
@@ -153,4 +166,47 @@ pub async fn handle_glm5(
     .await?;
 
     Ok(())
+}
+
+// ── Private helpers
+
+/// Fetches the user's stored conversation and converts it to the
+/// `messages` array format used by the OpenAI-compatible NVIDIA API.
+///
+/// Returns an empty `Vec` if the user cannot be identified or history
+/// retrieval fails — the caller still sends the current prompt alone.
+async fn build_openai_history(pool: &SqlitePool, msg: &Message, limit: i64) -> Vec<Value> {
+    let user = match &msg.from {
+        Some(u) => u,
+        None => return Vec::new(),
+    };
+
+    let internal_id = match upsert_user_and_get_id(pool, user).await {
+        Ok(id) => id,
+        Err(e) => {
+            log::warn!("handle_glm5: failed to get user id for history: {e}");
+            return Vec::new();
+        }
+    };
+
+    let history = match get_conversation_history(pool, internal_id, limit).await {
+        Ok(h) => h,
+        Err(e) => {
+            log::warn!("handle_glm5: failed to fetch conversation history: {e}");
+            return Vec::new();
+        }
+    };
+
+    history
+        .into_iter()
+        .map(|entry| {
+            // OpenAI-compatible API uses "user" / "assistant" roles.
+            let role = if entry.is_bot_message {
+                "assistant"
+            } else {
+                "user"
+            };
+            json!({ "role": role, "content": entry.message })
+        })
+        .collect()
 }
