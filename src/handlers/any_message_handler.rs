@@ -1,4 +1,4 @@
-use crate::utils::reply_markdown::reply_markdown;
+use crate::handlers::handle_glm5::handle_glm5;
 use crate::utils::{save_message::save_message, upsert_user::upsert_user_and_get_id};
 
 use sqlx::SqlitePool;
@@ -101,18 +101,23 @@ pub async fn any_message_handler(bot: Bot, msg: Message, pool: SqlitePool) -> Re
         return Ok(());
     }
 
-    // 7. Text (non-command)
-    if let Some(text) = msg.text() {
+    // 7. Text (non-command) → forward to GLM-5 AI
+    if let Some(text) = msg.clone().text() {
         if text.starts_with('/') {
             return Ok(()); // command already handled
         }
-        // save received text
+
+        // Save the incoming user message before calling the AI.
         if let Some(user) = &msg.from {
             if let Ok(internal_id) = upsert_user_and_get_id(&pool, user).await {
                 let _ = save_message(&pool, internal_id, text.to_string(), false, "text").await;
             }
         }
-        reply_markdown(bot, msg.clone(), format!("📢 : {text}"), &pool).await?;
+
+        // Delegate to GLM-5 (no reasoning mode for casual chat).
+        // handle_glm5 fetches conversation history, calls the API, and
+        // saves the bot reply via reply_markdown → save_bot_text.
+        handle_glm5(bot, msg, text.to_string(), false, pool).await?;
     }
 
     Ok(())
