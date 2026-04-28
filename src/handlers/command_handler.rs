@@ -38,7 +38,7 @@ pub async fn command_handler(
             reply_markdown(
                 bot,
                 msg,
-                "👋 Hello! I'm your Rust 🦀 bot powered by teloxide!\nJust type anything → I will echo it!\nUse /help for commands list".to_string(),
+                "👋 Hello! I'm your Rust 🦀 AI assistant bot.\nHow can i help you today?\nUse /help for commands list".to_string(),
                 &pool,
             )
             .await?;
