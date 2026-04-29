@@ -83,17 +83,17 @@ pub async fn handle_textqr(
             let _ = fs::remove_file(&path).await; // success cleanup
 
             // ── Save bot media ──
-            if let Some(user) = &msg.from {
-                if let Ok(internal_id) = upsert_user_and_get_id(&pool, user).await {
-                    let _ = save_message(
-                        &pool,
-                        internal_id,
-                        "sent file photo".to_string(),
-                        true,
-                        "photo",
-                    )
-                    .await;
-                }
+            if let Some(user) = &msg.from
+                && let Ok(internal_id) = upsert_user_and_get_id(&pool, user).await
+            {
+                let _ = save_message(
+                    &pool,
+                    internal_id,
+                    "sent file photo".to_string(),
+                    true,
+                    "photo",
+                )
+                .await;
             }
         }
 

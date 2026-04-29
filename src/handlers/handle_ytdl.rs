@@ -58,17 +58,17 @@ pub async fn handle_ytdl(
                 let _ = fs::remove_file(&path).await; // success path
 
                 // ── Save sent video ──
-                if let Some(user) = &msg.from {
-                    if let Ok(internal_id) = upsert_user_and_get_id(&pool, user).await {
-                        let _ = save_message(
-                            &pool,
-                            internal_id,
-                            "sent file video".to_string(),
-                            true,
-                            "video",
-                        )
-                        .await;
-                    }
+                if let Some(user) = &msg.from
+                    && let Ok(internal_id) = upsert_user_and_get_id(&pool, user).await
+                {
+                    let _ = save_message(
+                        &pool,
+                        internal_id,
+                        "sent file video".to_string(),
+                        true,
+                        "video",
+                    )
+                    .await;
                 }
             } else {
                 reply_markdown(

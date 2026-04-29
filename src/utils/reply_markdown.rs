@@ -61,9 +61,9 @@ pub async fn reply_markdown(
 }
 
 async fn save_bot_text(pool: &SqlitePool, msg: &Message, text: &str) {
-    if let Some(user) = &msg.from {
-        if let Ok(internal_id) = upsert_user_and_get_id(pool, user).await {
-            let _ = save_message(pool, internal_id, text.to_string(), true, "text").await;
-        }
+    if let Some(user) = &msg.from
+        && let Ok(internal_id) = upsert_user_and_get_id(pool, user).await
+    {
+        let _ = save_message(pool, internal_id, text.to_string(), true, "text").await;
     }
 }
