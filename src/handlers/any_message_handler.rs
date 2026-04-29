@@ -28,7 +28,7 @@ pub async fn any_message_handler(bot: Bot, msg: Message, pool: SqlitePool) -> Re
             .send_sticker(msg.chat.id, InputFile::file_id(sticker.file.id.clone()))
             .reply_to(msg.id)
             .await;
-        if let Ok(_) = res {
+        if res.is_ok() {
             let _ = save_media(&pool, &msg, true, "sticker").await;
         }
         return Ok(());
@@ -41,7 +41,7 @@ pub async fn any_message_handler(bot: Bot, msg: Message, pool: SqlitePool) -> Re
             .send_animation(msg.chat.id, InputFile::file_id(animation.file.id.clone()))
             .reply_to(msg.id)
             .await;
-        if let Ok(_) = res {
+        if res.is_ok() {
             let _ = save_media(&pool, &msg, true, "animation").await;
         }
         return Ok(());
@@ -54,7 +54,7 @@ pub async fn any_message_handler(bot: Bot, msg: Message, pool: SqlitePool) -> Re
             .send_video(msg.chat.id, InputFile::file_id(video.file.id.clone()))
             .reply_to(msg.id)
             .await;
-        if let Ok(_) = res {
+        if res.is_ok() {
             let _ = save_media(&pool, &msg, true, "video").await;
         }
         return Ok(());
@@ -69,7 +69,7 @@ pub async fn any_message_handler(bot: Bot, msg: Message, pool: SqlitePool) -> Re
             .send_photo(msg.chat.id, InputFile::file_id(largest.file.id.clone()))
             .reply_to(msg.id)
             .await;
-        if let Ok(_) = res {
+        if res.is_ok() {
             let _ = save_media(&pool, &msg, true, "photo").await;
         }
         return Ok(());
@@ -82,7 +82,7 @@ pub async fn any_message_handler(bot: Bot, msg: Message, pool: SqlitePool) -> Re
             .send_voice(msg.chat.id, InputFile::file_id(voice.file.id.clone()))
             .reply_to(msg.id)
             .await;
-        if let Ok(_) = res {
+        if res.is_ok() {
             let _ = save_media(&pool, &msg, true, "voice").await;
         }
         return Ok(());
@@ -95,7 +95,7 @@ pub async fn any_message_handler(bot: Bot, msg: Message, pool: SqlitePool) -> Re
             .send_document(msg.chat.id, InputFile::file_id(document.file.id.clone()))
             .reply_to(msg.id)
             .await;
-        if let Ok(_) = res {
+        if res.is_ok() {
             let _ = save_media(&pool, &msg, true, "document").await;
         }
         return Ok(());
