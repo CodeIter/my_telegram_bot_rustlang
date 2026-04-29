@@ -10,32 +10,39 @@ Whether you're looking for a fun utility bot or a solid foundation to build
 your own Telegram bot, this project combines simplicity with real-world
 functionality.
 
-### What makes it special?
-
-- **Zero external dependencies when running in Docker** — everything (including `yt-dlp` and `bc`) is bundled.
-- **Beautiful inline command menu** — just type `/` and see all available commands with descriptions.
-- **Rich media support** — echoes stickers, GIFs, photos, videos, voice messages, and documents back to the user.
-- **Practical utilities** in one place: encoding, decoding, randomness, calculations, YouTube downloads, and QR code generation.
-- **Production-ready** Docker setup with security best practices (non-root user, minimal Alpine base).
-
 This bot is perfect for learning Rust + Telegram bot development or as a
 starting point for your own advanced bot.
 
 ## Features
 
-- Plain text echoing (plus full media echo: stickers, GIFs, photos, videos, voice messages, documents)
-- Classic commands (`/start`, `/help`)
-- `/echo <text>`
-- URL decoding (`/urldecode <encoded>`)
-- Base64 encode/decode (`/textbase64encode <text>`, `/textbase64decode <text>`)
-- Random number generator (`/rng <min> <max>`)
-- Secure random password generation (`/password <length>`)
-- Mathematical expression evaluation via `bc` (`/bc <expression>`)
-- YouTube video download (`/ytdl <url>`) → sends MP4
-- YouTube audio download (`/ytdlmp3 <url>`) → sends MP3
-- QR code generation (`/textqr <text>`) → sends PNG image
+### 🤖 AI Chat
+- **Free-text chat** — any message without a command is automatically answered by GLM-5 AI with full conversation context
+- **`/glm5ai <prompt>`** — ask GLM-5 AI (fast, no reasoning)
+- **`/glm5aireasoning <prompt>`** — ask GLM-5 AI with step-by-step reasoning enabled
+- **`/gemini2 <prompt>`** — ask Google Gemini 2.5 Flash
+- **`/gemini3 <prompt>`** — ask Google Gemini 3 Flash Preview
+- **Conversation history** — all AI commands include previous messages as context for coherent multi-turn conversations
+- **`/clear`** — delete your entire conversation history and reset the AI context
 
-All commands are automatically registered with Telegram and appear in the **/** menu when you type `/`.
+### 🛠️ Utilities
+- **`/bc <expression>`** — evaluate math expressions using `bc` (e.g. `/bc sqrt(16)`, `/bc 2+2*3`)
+- **`/rng <min> <max>`** — generate a random number in range (min > 0)
+- **`/password <length>`** — generate a secure random password (2–128 characters)
+- **`/urldecode <encoded>`** — decode a percent-encoded URL string
+- **`/textbase64encode <text>`** — encode text to Base64
+- **`/textbase64decode <text>`** — decode a Base64 string
+- **`/textqr <text>`** — generate and send a QR code image for any text
+
+### 📥 Media Download
+- **`/ytdl <url>`** — download a video with `yt-dlp` and send it directly in chat
+- **`/ytdlmp3 <url>`** — download audio with `yt-dlp` and send it as an MP3 file
+
+### 📨 Media Echo
+- Automatically echoes back **stickers, animations, videos, photos, voice messages,** and **documents** sent to the bot
+
+### 💾 Persistence
+- All conversations (user messages and bot replies) are stored in a local **SQLite** database
+- User profiles are upserted on every interaction — no manual registration needed
 
 ## Prerequisites
 
@@ -48,36 +55,25 @@ All commands are automatically registered with Telegram and appear in the **/** 
 
 ## Installation
 
+```bash
+git clone https://github.com/CodeIter/my_telegram_bot_rustlang
+cd my_telegram_bot_rustlang
+
+cp .env.example .env
+# Edit .env and add your tokens:
+
+```
+
 ### Option 1: Local (Cargo)
 
 ```bash
-git clone https://github.com/CodeIter/my_telegram_bot_rustlang.git
-cd my_telegram_bot
-
-cp .env.example .env
-# Edit .env and add your token:
-# TELOXIDE_TOKEN=123456:AAFxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-
 cargo run
 ```
 
-### Option 2: Docker (recommended)
+### Option 2: Docker
 
 ```bash
-git clone https://github.com/CodeIter/my_telegram_bot_rustlang.git
-cd my_telegram_bot
-
-cp .env.example .env
-# Edit .env with your TELOXIDE_TOKEN
-
 docker compose up --build -d
-```
-
-**Useful commands:**
-```bash
-docker compose logs -f          # live logs
-docker compose restart          # restart bot
-docker compose down             # stop & remove container
 ```
 
 ## Development
